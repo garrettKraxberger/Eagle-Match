@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:eagle_match/services/supabase_service.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'signup_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -14,6 +15,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passwordController = TextEditingController();
   String? _errorMessage;
   bool _loading = false;
+  bool _obscurePassword = true;
 
   Future<void> _login() async {
     setState(() {
@@ -27,12 +29,16 @@ class _LoginScreenState extends State<LoginScreen> {
         password: _passwordController.text.trim(),
       );
 
-      if (res.user != null) {
-        // Navigate to home screen
+      if (res.user != null && res.session != null) {
+        final user = Supabase.instance.client.auth.currentUser;
+        print('✅ Supabase connected. Logged in user: ${user?.email}');
+
+        // ✅ Navigate to home screen after login success
         Navigator.pushReplacementNamed(context, '/home');
       } else {
         setState(() {
-          _errorMessage = res.error?.message ?? 'Unknown error';
+          _errorMessage =
+              'Login failed. Please check your credentials and try again.';
         });
       }
     } catch (e) {
@@ -40,7 +46,6 @@ class _LoginScreenState extends State<LoginScreen> {
         _errorMessage = e.toString();
       });
     }
-
     setState(() {
       _loading = false;
     });
@@ -49,7 +54,10 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Login')),
+      appBar: AppBar(
+        automaticallyImplyLeading: false, // Removes back button
+        title: const Text('Login'),
+      ),
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -60,8 +68,20 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
             TextField(
               controller: _passwordController,
-              obscureText: true,
-              decoration: const InputDecoration(labelText: 'Password'),
+              obscureText: _obscurePassword,
+              decoration: InputDecoration(
+                labelText: 'Password',
+                suffixIcon: IconButton(
+                  icon: Icon(
+                    _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                  ),
+                  onPressed: () {
+                    setState(() {
+                      _obscurePassword = !_obscurePassword;
+                    });
+                  },
+                ),
+              ),
             ),
             const SizedBox(height: 16),
             if (_errorMessage != null)
@@ -76,7 +96,7 @@ class _LoginScreenState extends State<LoginScreen> {
             const SizedBox(height: 16),
             TextButton(
               onPressed: () {
-                Navigator.push(
+                Navigator.pushReplacement(
                   context,
                   MaterialPageRoute(builder: (_) => const SignupScreen()),
                 );
