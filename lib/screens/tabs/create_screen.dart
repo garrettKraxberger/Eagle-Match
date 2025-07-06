@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+enum LocationMode { counties, course }
 
 class CreateScreen extends StatefulWidget {
   const CreateScreen({super.key});
@@ -9,7 +12,6 @@ class CreateScreen extends StatefulWidget {
 
 class _CreateScreenState extends State<CreateScreen> {
   String _matchType = 'Match Play';
-  String _course = '';
   DateTime? _selectedDate;
   TimeOfDay? _selectedTime;
   bool _isPrivate = false;
@@ -19,37 +21,148 @@ class _CreateScreenState extends State<CreateScreen> {
   final _notesController = TextEditingController();
 
   final List<String> _matchTypes = ['Match Play', 'Stroke Play'];
-  final List<String> _courses = ['Pebble Beach', 'Augusta', 'TPC Scottsdale'];
-  final List<String> _starredDuos = ['Teammate A', 'Teammate B', 'Teammate C'];
+  LocationMode _locationMode = LocationMode.counties;
 
-  Future<void> _pickDate() async {
-    final now = DateTime.now();
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: now,
-      firstDate: now,
-      lastDate: DateTime(now.year + 1),
-    );
-    if (picked != null) {
-      setState(() => _selectedDate = picked);
+  Map<String, int> _courseMap = {};
+  Map<String, int> _countyMap = {};
+  List<String> _courses = [];
+
+  Map<String, List<String>> _stateToCounties = {};
+  List<String> _states = [];
+  String? _selectedState;
+  List<String> _filteredCounties = [];
+  Set<String> _selectedCounties = {};
+
+  String _selectedCourse = '';
+  final _courseController = TextEditingController();
+  final _cityController = TextEditingController();
+
+  bool _loadingCourses = true;
+  bool _loadingCounties = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCourses();
+    _loadCounties();
+  }
+
+  Future<void> _loadCourses() async {
+    try {
+      final data = await Supabase.instance.client
+          .from('courses')
+          .select('id, name')
+          .order('name');
+      setState(() {
+        _courses = data.map<String>((e) => e['name'] as String).toList();
+        _courseMap = {for (var e in data) e['name']: e['id']};
+        _loadingCourses = false;
+      });
+    } catch (error) {
+      print('Error loading courses: $error');
+      setState(() => _loadingCourses = false);
     }
   }
 
-  Future<void> _pickTime() async {
-    final picked = await showTimePicker(
-      context: context,
-      initialTime: TimeOfDay.now(),
-    );
-    if (picked != null) {
-      setState(() => _selectedTime = picked);
+  Future<void> _loadCounties() async {
+    try {
+      final data = await Supabase.instance.client
+          .from('counties')
+          .select('id, county, state')
+          .order('state')
+          .order('county');
+
+      final Set<String> states = {};
+      final Map<String, List<String>> stateToCounties = {};
+      final Map<String, int> countyMap = {};
+
+      for (var row in data) {
+        final state = row['state'];
+        final county = row['county'];
+        final full = '$county, $state';
+
+        states.add(state);
+        stateToCounties[state] = [...?stateToCounties[state], county];
+        countyMap[full] = row['id'];
+      }
+
+      setState(() {
+        _states = states.toList()..sort();
+        _stateToCounties = stateToCounties;
+        _countyMap = countyMap;
+        _loadingCounties = false;
+      });
+    } catch (error) {
+      print('Error loading counties: $error');
+      setState(() => _loadingCounties = false);
     }
   }
 
-  void _submitMatch() {
-    // TODO: Validate and submit match details to Supabase or backend
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Match posted successfully!')),
-    );
+  void _updateFilteredCounties() {
+    if (_selectedState != null && _stateToCounties.containsKey(_selectedState)) {
+      setState(() {
+        _filteredCounties = _stateToCounties[_selectedState]!;
+      });
+    } else {
+      setState(() => _filteredCounties = []);
+    }
+  }
+
+  void _resetLocationFields() {
+    setState(() {
+      _selectedState = null;
+      _filteredCounties = [];
+      _selectedCounties.clear();
+      _selectedCourse = '';
+      _courseController.clear();
+      _cityController.clear();
+    });
+  }
+
+  Future<void> _submitMatch() async {
+    if (_locationMode == LocationMode.counties && _selectedCounties.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select at least one county.')),
+      );
+      return;
+    }
+
+    if (_locationMode == LocationMode.course && _selectedCourse.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter a course name.')),
+      );
+      return;
+    }
+
+    final locationIds = _locationMode == LocationMode.counties
+        ? _selectedCounties
+            .map((c) => _countyMap['$c, $_selectedState'])
+            .whereType<int>()
+            .toList()
+        : [_courseMap[_selectedCourse]].whereType<int>().toList();
+
+    final response = await Supabase.instance.client.from('matches').insert({
+      'match_type': _matchType,
+      'location_mode': _locationMode.name,
+      'location_ids': locationIds,
+      'match_mode': _matchMode,
+      'handicap': _handicap,
+      'is_private': _isPrivate,
+      'notes': _notesController.text,
+      'date': _selectedDate?.toIso8601String(),
+      'time': _selectedTime?.format(context),
+      'teammate': _selectedTeammate.isNotEmpty ? _selectedTeammate : null,
+    });
+
+    if (response.error != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: ${response.error!.message}')),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Match posted successfully!')),
+      );
+    }
   }
 
   @override
@@ -68,65 +181,143 @@ class _CreateScreenState extends State<CreateScreen> {
               onChanged: (value) => setState(() => _matchType = value!),
               decoration: const InputDecoration(labelText: 'Match Type'),
             ),
-            DropdownButtonFormField<String>(
-              value: _course.isEmpty ? null : _course,
-              items: _courses
-                  .map((course) => DropdownMenuItem(value: course, child: Text(course)))
-                  .toList(),
-              onChanged: (value) => setState(() => _course = value ?? ''),
-              decoration: const InputDecoration(labelText: 'Course'),
+            const SizedBox(height: 16),
+            const Text('Select Location Mode:'),
+            Row(
+              children: [
+                Expanded(
+                  child: RadioListTile<LocationMode>(
+                    title: const Text('Choose Counties'),
+                    value: LocationMode.counties,
+                    groupValue: _locationMode,
+                    onChanged: (value) {
+                      if (value != null) {
+                        _resetLocationFields();
+                        setState(() => _locationMode = value);
+                      }
+                    },
+                  ),
+                ),
+                Expanded(
+                  child: RadioListTile<LocationMode>(
+                    title: const Text('Choose Course'),
+                    value: LocationMode.course,
+                    groupValue: _locationMode,
+                    onChanged: (value) {
+                      if (value != null) {
+                        _resetLocationFields();
+                        setState(() => _locationMode = value);
+                      }
+                    },
+                  ),
+                ),
+              ],
             ),
-            ListTile(
-              title: Text(_selectedDate == null
-                  ? 'Pick Date'
-                  : 'Date: ${_selectedDate!.month}/${_selectedDate!.day}/${_selectedDate!.year}'),
-              trailing: const Icon(Icons.calendar_today),
-              onTap: _pickDate,
-            ),
-            ListTile(
-              title: Text(_selectedTime == null
-                  ? 'Pick Time'
-                  : 'Time: ${_selectedTime!.format(context)}'),
-              trailing: const Icon(Icons.access_time),
-              onTap: _pickTime,
-            ),
-            SwitchListTile(
-              title: const Text('Private Match'),
-              value: _isPrivate,
-              onChanged: (value) => setState(() => _isPrivate = value),
-            ),
-            TextField(
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(labelText: 'Handicap Required (Optional)'),
-              onChanged: (value) => _handicap = value,
-            ),
-            DropdownButtonFormField<String>(
-              value: _matchMode,
-              items: ['Single', 'Duo']
-                  .map((mode) => DropdownMenuItem(value: mode, child: Text(mode)))
-                  .toList(),
-              onChanged: (value) => setState(() => _matchMode = value!),
-              decoration: const InputDecoration(labelText: 'Match Mode'),
-            ),
-            DropdownButtonFormField<String>(
-              value: _selectedTeammate.isEmpty ? null : _selectedTeammate,
-              items: _starredDuos
-                  .map((teammate) =>
-                      DropdownMenuItem(value: teammate, child: Text(teammate)))
-                  .toList(),
-              onChanged: (value) => setState(() => _selectedTeammate = value ?? ''),
-              decoration: const InputDecoration(labelText: 'Invite Teammate (Optional)'),
-            ),
-            TextField(
-              controller: _notesController,
-              maxLines: 3,
-              decoration: const InputDecoration(labelText: 'Notes'),
-            ),
+            const SizedBox(height: 8),
+            if (_loadingCounties || _loadingCourses)
+              const CircularProgressIndicator()
+            else ...[
+              Autocomplete<String>(
+                optionsBuilder: (TextEditingValue textEditingValue) {
+                  return _states
+                      .where((state) => state.toLowerCase().contains(textEditingValue.text.toLowerCase()))
+                      .toList();
+                },
+                onSelected: (state) {
+                  setState(() {
+                    _selectedState = state;
+                    _updateFilteredCounties();
+                  });
+                },
+                fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) {
+                  return TextFormField(
+                    controller: controller,
+                    focusNode: focusNode,
+                    decoration: const InputDecoration(
+                      labelText: 'Search for State',
+                      border: OutlineInputBorder(),
+                    ),
+                    onChanged: (val) {
+                      setState(() => _selectedState = val);
+                    },
+                    onFieldSubmitted: (val) {
+                      setState(() {
+                        _selectedState = val;
+                        _updateFilteredCounties();
+                      });
+                    },
+                  );
+                },
+              ),
+              const SizedBox(height: 16),
+              Autocomplete<String>(
+                optionsBuilder: (TextEditingValue textEditingValue) {
+                  if (_selectedState == null) return const Iterable<String>.empty();
+                  return _filteredCounties
+                      .where((county) => county.toLowerCase().contains(textEditingValue.text.toLowerCase()))
+                      .toList();
+                },
+                onSelected: (county) {
+                  setState(() {
+                    if (_locationMode == LocationMode.counties) {
+                      _selectedCounties.add(county);
+                    } else {
+                      _selectedCounties = {county};
+                    }
+                  });
+                },
+                fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) {
+                  return TextFormField(
+                    controller: controller,
+                    focusNode: focusNode,
+                    decoration: const InputDecoration(
+                      labelText: 'Search/Add County',
+                      border: OutlineInputBorder(),
+                      hintText: 'Type to search counties...'
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(height: 10),
+              if (_locationMode == LocationMode.counties)
+                Wrap(
+                  spacing: 8,
+                  children: _selectedCounties.map((c) {
+                    return Chip(
+                      label: Text(c),
+                      onDeleted: () => setState(() => _selectedCounties.remove(c)),
+                    );
+                  }).toList(),
+                ),
+              if (_locationMode == LocationMode.course)
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 16),
+                    TextFormField(
+                      controller: _courseController,
+                      decoration: const InputDecoration(
+                        labelText: 'Course Name',
+                        border: OutlineInputBorder(),
+                      ),
+                      onChanged: (val) => setState(() => _selectedCourse = val),
+                    ),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: _cityController,
+                      decoration: const InputDecoration(
+                        labelText: 'City (optional)',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                  ],
+                ),
+            ],
             const SizedBox(height: 24),
             ElevatedButton(
               onPressed: _submitMatch,
               child: const Text('Post Match'),
-            ),
+            )
           ],
         ),
       ),
