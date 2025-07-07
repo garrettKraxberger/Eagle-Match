@@ -42,52 +42,109 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   DateTime? _selectedBirthday;
   bool _loading = false;
 
+  // Test Supabase connection
+  Future<void> _testSupabaseConnection() async {
+    try {
+      print('Testing Supabase connection...');
+      
+      // Test auth
+      final user = Supabase.instance.client.auth.currentUser;
+      print('Current user: ${user?.id}');
+      
+      // Test storage access
+      final buckets = await Supabase.instance.client.storage.listBuckets();
+      print('Available buckets: ${buckets.map((b) => b.name).toList()}');
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Supabase connection OK. User: ${user?.id}')),
+      );
+    } catch (e) {
+      print('Supabase connection test failed: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Supabase connection failed: $e')),
+      );
+    }
+  }
+
   Future<void> _pickAndUploadImage() async {
     final picker = ImagePicker();
     final pickedFile = await picker.pickImage(source: ImageSource.gallery);
     if (pickedFile == null) return;
 
-    final fileName =
-        '${DateTime.now().millisecondsSinceEpoch}_${p.basename(pickedFile.path)}';
     final userId = Supabase.instance.client.auth.currentUser?.id;
-    if (userId == null) return;
+    if (userId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('User not authenticated')),
+      );
+      return;
+    }
 
-    final filePath = 'public/$userId/$fileName';
+    print('Starting image upload for user: $userId');
+    
+    // Show loading indicator
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Uploading image...')),
+    );
 
     try {
-      final storage = Supabase.instance.client.storage.from('profile_images');
+      // Use a simpler file path structure
+      final ext = p.extension(pickedFile.path);
+      final fileName = '$userId$ext';
+      final filePath = fileName; // Just use the filename without subdirectory
+      
+      print('File path: $filePath');
+      print('File extension: $ext');
 
-      if (kIsWeb) {
-        final bytes = await pickedFile.readAsBytes();
-        final res = await storage.uploadBinary(
-          filePath,
-          bytes,
-          fileOptions: const FileOptions(upsert: true),
-        );
-        print('Web upload response: $res');
-        setState(() {
+      final storage = Supabase.instance.client.storage.from('avatars');
+      final bytes = await pickedFile.readAsBytes();
+      
+      print('File size: ${bytes.length} bytes');
+      
+      // Upload the image
+      final uploadResult = await storage.uploadBinary(
+        filePath,
+        bytes,
+        fileOptions: const FileOptions(
+          upsert: true,
+          contentType: 'image/jpeg', // Explicitly set content type
+        ),
+      );
+
+      print('Upload result: $uploadResult');
+
+      // Get public URL
+      final publicUrl = storage.getPublicUrl(filePath);
+      print('Public URL: $publicUrl');
+      
+      setState(() {
+        if (kIsWeb) {
           _imageBytes = bytes;
-          _uploadedImageUrl = storage.getPublicUrl(filePath);
-        });
-      } else {
-        final file = io.File(pickedFile.path);
-        final bytes = await file.readAsBytes();
-        final res = await storage.uploadBinary(
-          filePath,
-          bytes,
-          fileOptions: const FileOptions(upsert: true),
-        );
-        print('Mobile upload response: $res');
-        setState(() {
-          _image = file;
-          _uploadedImageUrl = storage.getPublicUrl(filePath);
-        });
-      }
+        } else {
+          _image = io.File(pickedFile.path);
+        }
+        _uploadedImageUrl = publicUrl;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Profile image uploaded successfully!')),
+      );
     } catch (e) {
       print('Image upload failed: $e');
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Image upload failed.')));
+      print('Error type: ${e.runtimeType}');
+      
+      // More specific error handling
+      String errorMessage = 'Image upload failed';
+      if (e.toString().contains('not found')) {
+        errorMessage = 'Storage bucket not found. Please check Supabase configuration.';
+      } else if (e.toString().contains('permission')) {
+        errorMessage = 'Permission denied. Please check storage policies.';
+      } else if (e.toString().contains('size')) {
+        errorMessage = 'File too large. Please choose a smaller image.';
+      }
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(errorMessage)),
+      );
     }
   }
 
@@ -123,7 +180,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
           .upsert(data)
           .select()
           .single();
-      Navigator.pushReplacementNamed(context, '/home');
+      Navigator.pushReplacementNamed(context, '/dash');
     } catch (error) {
       ScaffoldMessenger.of(
         context,
@@ -148,12 +205,6 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final avatar = (kIsWeb && _imageBytes != null)
-        ? CircleAvatar(radius: 40, backgroundImage: MemoryImage(_imageBytes!))
-        : (!kIsWeb && _image != null)
-            ? CircleAvatar(radius: 40, backgroundImage: FileImage(_image!))
-            : const CircleAvatar(radius: 40, child: Icon(Icons.person));
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('Set Up Profile'),
@@ -168,13 +219,60 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
               Center(
                 child: Column(
                   children: [
-                    avatar,
-                    TextButton(
-                      onPressed: _pickAndUploadImage,
-                      child: const Text('Upload Profile Image'),
+                    GestureDetector(
+                      onTap: _pickAndUploadImage,
+                      child: Stack(
+                        children: [
+                          (kIsWeb && _imageBytes != null)
+                              ? CircleAvatar(
+                                  radius: 50,
+                                  backgroundImage: MemoryImage(_imageBytes!)
+                                )
+                              : (!kIsWeb && _image != null)
+                                  ? CircleAvatar(
+                                      radius: 50,
+                                      backgroundImage: FileImage(_image!)
+                                    )
+                                  : const CircleAvatar(
+                                      radius: 50,
+                                      child: Icon(Icons.person, size: 40)
+                                    ),
+                          Positioned(
+                            bottom: 0,
+                            right: 0,
+                            child: Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: const BoxDecoration(
+                                color: Colors.blue,
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(
+                                Icons.camera_alt,
+                                size: 20,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Tap to add profile photo',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey,
+                      ),
                     ),
                   ],
                 ),
+              ),
+              const SizedBox(height: 16),
+              // Debug button - remove this in production
+              ElevatedButton(
+                onPressed: _testSupabaseConnection,
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
+                child: const Text('Test Supabase Connection'),
               ),
               const SizedBox(height: 16),
               TextFormField(
