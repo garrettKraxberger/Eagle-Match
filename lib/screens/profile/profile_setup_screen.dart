@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path/path.dart' as p;
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:storage_client/storage_client.dart'; // Needed for FileOptions
+// Needed for FileOptions
 
 class ProfileSetupScreen extends StatefulWidget {
   const ProfileSetupScreen({super.key});
@@ -164,19 +164,18 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
 
     final data = {
       'id': userId,
-      'first_name': _firstNameController.text.trim(),
-      'last_name': _lastNameController.text.trim(),
-      'birthday': _selectedBirthday?.toIso8601String(),
-      'city': _cityController.text.trim(),
-      'state': _selectedState,
+      'full_name': '${_firstNameController.text.trim()} ${_lastNameController.text.trim()}',
+      'age': _selectedBirthday != null ? DateTime.now().difference(_selectedBirthday!).inDays ~/ 365 : null,
       'handicap': double.tryParse(_handicapController.text.trim()),
-      'home_course': _courseController.text.trim(),
+      'location': _selectedState != null && _cityController.text.isNotEmpty 
+          ? '${_cityController.text.trim()}, $_selectedState' 
+          : null,
       'profile_image_url': _uploadedImageUrl,
     };
 
     try {
       await Supabase.instance.client
-          .from('users')
+          .from('profiles')
           .upsert(data)
           .select()
           .single();

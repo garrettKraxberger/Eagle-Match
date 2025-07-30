@@ -34,7 +34,7 @@ class _LoginScreenState extends State<LoginScreen> {
         print('✅ Supabase connected. Logged in user: ${user?.email}');
 
         // ✅ Navigate to home screen after login success
-        Navigator.pushReplacementNamed(context, '/home');
+        Navigator.pushReplacementNamed(context, '/dash');
       } else {
         setState(() {
           _errorMessage =

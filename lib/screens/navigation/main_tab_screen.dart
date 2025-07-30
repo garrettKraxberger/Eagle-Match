@@ -5,6 +5,8 @@ import 'package:eagle_match/screens/tabs/find_screen.dart';
 import 'package:eagle_match/screens/tabs/create_screen.dart';
 import 'package:eagle_match/screens/tabs/matches_screen.dart';
 import 'package:eagle_match/screens/tabs/duos_screen.dart';
+import 'package:eagle_match/screens/database_test_screen.dart'; // Add database test screen
+import '../../theme/usga_theme.dart';
 
 class MainTabScreen extends StatefulWidget {
   const MainTabScreen({super.key});
@@ -22,6 +24,7 @@ static final List<Widget> _screens = <Widget>[
   const MatchesScreen(),
   const DuosScreen(),
   const AccountScreen(),
+  const DatabaseTestScreen(), // Add database test screen
 ];
 
   void _onItemTapped(int index) {
@@ -35,8 +38,8 @@ static final List<Widget> _screens = <Widget>[
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _selectedIndex,
         onTap: _onItemTapped,
-        selectedItemColor: Colors.green,
-        unselectedItemColor: Colors.grey,
+        selectedItemColor: USGATheme.accentRed,
+        unselectedItemColor: USGATheme.textLight,
         type: BottomNavigationBarType.fixed,
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.search), label: 'Find'),
@@ -44,6 +47,7 @@ static final List<Widget> _screens = <Widget>[
           BottomNavigationBarItem(icon: Icon(Icons.chat_bubble), label: 'Matches'),
           BottomNavigationBarItem(icon: Icon(Icons.group), label: 'Duos'),
           BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Account'),
+          BottomNavigationBarItem(icon: Icon(Icons.bug_report), label: 'DB Test'), // Add database test tab
         ],
       ),
     );
