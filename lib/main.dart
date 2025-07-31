@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 // Theme
 import 'theme/usga_theme.dart';
+import 'theme/theme_manager.dart';
 
 // Screens
 import 'screens/auth/login_screen.dart';
@@ -37,6 +38,7 @@ class EagleMatchApp extends StatefulWidget {
 
 class _EagleMatchAppState extends State<EagleMatchApp> {
   final _navigatorKey = GlobalKey<NavigatorState>();
+  final ThemeManager _themeManager = ThemeManager();
 
   @override
   void initState() {
@@ -68,18 +70,25 @@ class _EagleMatchAppState extends State<EagleMatchApp> {
   Widget build(BuildContext context) {
     final session = Supabase.instance.client.auth.currentSession;
 
-    return MaterialApp(
-      navigatorKey: _navigatorKey,
-      title: 'Eagle Match',
-      theme: USGATheme.theme, // Apply USGA theme
-      initialRoute: session != null ? '/dash' : '/login',
-      routes: {
-        '/login': (_) => const LoginScreen(),
-        '/signup': (_) => const SignupScreen(),
-        '/dash': (_) => const MainTabScreen(), // ✅ Updated to go straight to tabbed layout
-        '/profile-setup': (_) => const ProfileSetupScreen(),
+    return AnimatedBuilder(
+      animation: _themeManager,
+      builder: (context, child) {
+        return MaterialApp(
+          navigatorKey: _navigatorKey,
+          title: 'Eagle Match',
+          theme: USGATheme.lightTheme,
+          darkTheme: USGATheme.darkTheme,
+          themeMode: _themeManager.isDarkMode ? ThemeMode.dark : ThemeMode.light,
+          initialRoute: session != null ? '/dash' : '/login',
+          routes: {
+            '/login': (_) => const LoginScreen(),
+            '/signup': (_) => const SignupScreen(),
+            '/dash': (_) => const MainTabScreen(), // ✅ Updated to go straight to tabbed layout
+            '/profile-setup': (_) => const ProfileSetupScreen(),
+          },
+          debugShowCheckedModeBanner: false,
+        );
       },
-      debugShowCheckedModeBanner: false,
     );
   }
 }

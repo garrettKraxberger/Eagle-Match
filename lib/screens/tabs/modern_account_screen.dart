@@ -1,13 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../theme/usga_theme.dart';
-import '../../theme/theme_manager.dart';
-import '../../widgets/dark_mode_toggle.dart';
 import '../database_test_screen.dart';
 import '../auth/login_screen.dart';
-import '../profile/edit_profile_screen.dart';
-import '../stats/player_stats_screen.dart';
-import '../../utils/privacy_utils.dart';
 
 class AccountScreen extends StatefulWidget {
   const AccountScreen({super.key});
@@ -19,16 +14,15 @@ class AccountScreen extends StatefulWidget {
 class _AccountScreenState extends State<AccountScreen> {
   Map<String, dynamic>? _userData;
   bool _loading = true;
-  final ThemeManager _themeManager = ThemeManager();
 
   Future<void> _loadUserData() async {
     final userId = Supabase.instance.client.auth.currentUser?.id;
     if (userId == null) return;
 
     try {
-      // Load profile data with calculated age from birth_date
+      // Load profile data from the correct 'profiles' table
       final profileResponse = await Supabase.instance.client
-          .from('profiles_with_age')
+          .from('profiles')
           .select()
           .eq('id', userId)
           .single();
@@ -203,7 +197,7 @@ class _AccountScreenState extends State<AccountScreen> {
   Widget build(BuildContext context) {
     if (_loading) {
       return Scaffold(
-        backgroundColor: USGATheme.adaptiveBackground(_themeManager.isDarkMode),
+        backgroundColor: USGATheme.backgroundWhite,
         body: const Center(
           child: CircularProgressIndicator(),
         ),
@@ -212,7 +206,7 @@ class _AccountScreenState extends State<AccountScreen> {
 
     if (_userData == null) {
       return Scaffold(
-        backgroundColor: USGATheme.adaptiveBackground(_themeManager.isDarkMode),
+        backgroundColor: USGATheme.backgroundWhite,
         body: USGATheme.emptyState(
           icon: Icons.error_outline,
           title: 'No Profile Found',
@@ -229,77 +223,70 @@ class _AccountScreenState extends State<AccountScreen> {
     final stats = _userData!['stats'] as Map<String, dynamic>? ?? {};
     final partnershipStats = _userData!['partnership_stats'] as Map<String, dynamic>? ?? {};
 
-    return AnimatedBuilder(
-      animation: _themeManager,
-      builder: (context, child) {
-        return Scaffold(
-          backgroundColor: USGATheme.adaptiveBackground(_themeManager.isDarkMode),
-          appBar: AppBar(
-            title: const Text('Account'),
-            backgroundColor: USGATheme.adaptiveBackground(_themeManager.isDarkMode),
-            foregroundColor: USGATheme.adaptiveTextPrimary(_themeManager.isDarkMode),
-            actions: [
-              IconButton(
-                icon: const Icon(Icons.edit_rounded),
-                onPressed: _navigateToEditProfile,
-                tooltip: 'Edit Profile',
-              ),
-              PopupMenuButton<String>(
-                icon: const Icon(Icons.more_horiz),
-                onSelected: (value) {
-                  if (value == 'logout') {
-                    _logout();
-                  }
-                },
-                itemBuilder: (BuildContext context) {
-                  return [
-                    PopupMenuItem<String>(
-                      value: 'logout',
-                      child: Row(
-                        children: [
-                          Icon(Icons.logout_rounded, 
-                              color: USGATheme.accentRed, size: 20),
-                          const SizedBox(width: USGATheme.spacingSm),
-                          const Text('Logout'),
-                        ],
-                      ),
-                    ),
-                  ];
-                },
-              ),
+    return Scaffold(
+      backgroundColor: USGATheme.backgroundWhite,
+      appBar: AppBar(
+        title: const Text('Account'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.edit_rounded),
+            onPressed: _navigateToEditProfile,
+            tooltip: 'Edit Profile',
+          ),
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_horiz),
+            onSelected: (value) {
+              if (value == 'logout') {
+                _logout();
+              }
+            },
+            itemBuilder: (BuildContext context) {
+              return [
+                PopupMenuItem<String>(
+                  value: 'logout',
+                  child: Row(
+                    children: [
+                      Icon(Icons.logout_rounded, 
+                          color: USGATheme.accentRed, size: 20),
+                      const SizedBox(width: USGATheme.spacingSm),
+                      const Text('Logout'),
+                    ],
+                  ),
+                ),
+              ];
+            },
+          ),
+        ],
+      ),
+      body: RefreshIndicator(
+        onRefresh: _loadUserData,
+        color: USGATheme.primaryNavy,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: Column(
+            children: [
+              const SizedBox(height: USGATheme.spacingLg),
+              
+              // Profile Header Card
+              _buildProfileHeader(user),
+              
+              const SizedBox(height: USGATheme.spacingLg),
+              
+              // Statistics Section
+              USGATheme.sectionHeader('Statistics'),
+              _buildStatsGrid(stats, partnershipStats),
+              
+              const SizedBox(height: USGATheme.spacingLg),
+              
+              // Quick Actions Section
+              USGATheme.sectionHeader('Quick Actions'),
+              _buildQuickActions(),
+              
+              const SizedBox(height: USGATheme.spacing2xl),
             ],
           ),
-          body: RefreshIndicator(
-            onRefresh: _loadUserData,
-            color: USGATheme.primaryNavy,
-            child: SingleChildScrollView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              child: Column(
-                children: [
-                  const SizedBox(height: USGATheme.spacingLg),
-                  
-                  // Profile Header Card
-                  _buildProfileHeader(user),
-                  
-                  const SizedBox(height: USGATheme.spacingLg),
-                  
-                  // Statistics Section
-                  USGATheme.sectionHeader('Statistics'),
-                  _buildStatsGrid(stats, partnershipStats),
-                  
-                  const SizedBox(height: USGATheme.spacingLg),
-                  
-                  // Quick Actions Section
-                  USGATheme.sectionHeader('Quick Actions'),
-                  _buildQuickActions(),
-                  
-                  const SizedBox(height: USGATheme.spacing2xl),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
+        ),
+      ),
     );
   }
 
@@ -311,97 +298,69 @@ class _AccountScreenState extends State<AccountScreen> {
     final age = _userData!['age']?.toString() ?? 'Age not set';
     final handicap = _userData!['handicap']?.toString() ?? 'Handicap not set';
 
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: USGATheme.spacingMd, vertical: USGATheme.spacingSm),
-      decoration: BoxDecoration(
-        color: USGATheme.adaptiveSurface(_themeManager.isDarkMode),
-        borderRadius: BorderRadius.circular(USGATheme.radiusLg),
-        border: Border.all(color: USGATheme.adaptiveBorder(_themeManager.isDarkMode), width: 1),
-        boxShadow: [
-          BoxShadow(
-            color: USGATheme.primaryNavy.withOpacity(_themeManager.isDarkMode ? 0.1 : 0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(USGATheme.spacingLg),
-        child: Column(
-          children: [
-            // Profile Image and Basic Info
-            Row(
-              children: [
-                // Profile Picture
-                Container(
-                  width: 80,
-                  height: 80,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: USGATheme.accentGold,
-                      width: 3,
+    return USGATheme.modernCard(
+      child: Column(
+        children: [
+          // Profile Image and Basic Info
+          Row(
+            children: [
+              // Profile Picture
+              Container(
+                width: 80,
+                height: 80,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: USGATheme.accentGold,
+                    width: 3,
+                  ),
+                ),
+                child: profileImageUrl != null
+                    ? ClipOval(
+                        child: Image.network(
+                          profileImageUrl,
+                          width: 74,
+                          height: 74,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) {
+                            return _buildFallbackAvatar(fullName);
+                          },
+                        ),
+                      )
+                    : _buildFallbackAvatar(fullName),
+              ),
+              
+              const SizedBox(width: USGATheme.spacingLg),
+              
+              // Name and Email
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      fullName,
+                      style: Theme.of(context).textTheme.headlineMedium,
                     ),
-                  ),
-                  child: profileImageUrl != null
-                      ? ClipOval(
-                          child: Image.network(
-                            profileImageUrl,
-                            width: 74,
-                            height: 74,
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) {
-                              return _buildFallbackAvatar(fullName);
-                            },
-                          ),
-                        )
-                      : _buildFallbackAvatar(fullName),
+                    const SizedBox(height: USGATheme.spacingXs),
+                    Text(
+                      email,
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                  ],
                 ),
-                
-                const SizedBox(width: USGATheme.spacingLg),
-                
-                // Name and Email
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        fullName,
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w600,
-                          color: USGATheme.adaptiveTextPrimary(_themeManager.isDarkMode),
-                          letterSpacing: -0.3,
-                          height: 1.4,
-                        ),
-                      ),
-                      const SizedBox(height: USGATheme.spacingXs),
-                      Text(
-                        email,
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w400,
-                          color: USGATheme.adaptiveTextSecondary(_themeManager.isDarkMode),
-                          letterSpacing: 0.2,
-                          height: 1.6,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            
-            const SizedBox(height: USGATheme.spacingLg),
-            
-            // Profile Details
-            _buildDetailRow(Icons.location_on_rounded, 'Location', location),
-            const SizedBox(height: USGATheme.spacingSm),
-            _buildDetailRow(Icons.cake_rounded, 'Age', age),
-            const SizedBox(height: USGATheme.spacingSm),
-            _buildDetailRow(Icons.sports_golf_rounded, 'Handicap', handicap),
-          ],
-        ),
+              ),
+            ],
+          ),
+          
+          const SizedBox(height: USGATheme.spacingLg),
+          
+          // Profile Details
+          _buildDetailRow(Icons.location_on_rounded, 'Location', location),
+          const SizedBox(height: USGATheme.spacingSm),
+          _buildDetailRow(Icons.cake_rounded, 'Age', age),
+          const SizedBox(height: USGATheme.spacingSm),
+          _buildDetailRow(Icons.sports_golf_rounded, 'Handicap', handicap),
+        ],
       ),
     );
   }
@@ -416,7 +375,7 @@ class _AccountScreenState extends State<AccountScreen> {
       ),
       child: Center(
         child: Text(
-          PrivacyUtils.getInitials(name),
+          name.isNotEmpty ? name[0].toUpperCase() : 'U',
           style: const TextStyle(
             fontSize: 32,
             fontWeight: FontWeight.w700,
@@ -433,28 +392,18 @@ class _AccountScreenState extends State<AccountScreen> {
         Icon(
           icon,
           size: 20,
-          color: USGATheme.adaptiveTextSecondary(_themeManager.isDarkMode),
+          color: USGATheme.textSecondary,
         ),
         const SizedBox(width: USGATheme.spacingSm),
         Text(
           label,
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w400,
-            color: USGATheme.adaptiveTextSecondary(_themeManager.isDarkMode),
-            letterSpacing: 0.2,
-            height: 1.6,
-          ),
+          style: Theme.of(context).textTheme.bodyMedium,
         ),
         const Spacer(),
         Text(
           value,
-          style: TextStyle(
-            fontSize: 16,
+          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
             fontWeight: FontWeight.w600,
-            color: USGATheme.adaptiveTextPrimary(_themeManager.isDarkMode),
-            letterSpacing: 0.1,
-            height: 1.5,
           ),
         ),
       ],
@@ -530,26 +479,6 @@ class _AccountScreenState extends State<AccountScreen> {
       padding: const EdgeInsets.symmetric(horizontal: USGATheme.spacingMd),
       child: Column(
         children: [
-          // Dark Mode Toggle
-          DarkModeToggle(
-            isDark: _themeManager.isDarkMode,
-            onChanged: (value) {
-              _themeManager.setTheme(value);
-            },
-          ),
-          const SizedBox(height: USGATheme.spacingSm),
-          _buildActionTile(
-            icon: Icons.analytics_rounded,
-            title: 'Player Statistics',
-            subtitle: 'View detailed stats and achievements',
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const PlayerStatsScreen()),
-              );
-            },
-          ),
-          const SizedBox(height: USGATheme.spacingSm),
           _buildActionTile(
             icon: Icons.person_rounded,
             title: 'Edit Profile',
@@ -579,80 +508,64 @@ class _AccountScreenState extends State<AccountScreen> {
     required String subtitle,
     required VoidCallback onTap,
   }) {
-    return Container(
-      margin: const EdgeInsets.symmetric(vertical: USGATheme.spacingXs),
-      decoration: BoxDecoration(
-        color: USGATheme.adaptiveSurface(_themeManager.isDarkMode),
-        borderRadius: BorderRadius.circular(USGATheme.radiusLg),
-        border: Border.all(color: USGATheme.adaptiveBorder(_themeManager.isDarkMode), width: 1),
-        boxShadow: [
-          BoxShadow(
-            color: USGATheme.primaryNavy.withOpacity(_themeManager.isDarkMode ? 0.1 : 0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
+    return USGATheme.modernCard(
+      onTap: onTap,
+      padding: const EdgeInsets.all(USGATheme.spacingLg),
+      child: Row(
+        children: [
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: USGATheme.primaryNavy.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(USGATheme.radiusMd),
+            ),
+            child: Icon(
+              icon,
+              color: USGATheme.primaryNavy,
+              size: 24,
+            ),
           ),
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(USGATheme.radiusLg),
-          child: Padding(
-            padding: const EdgeInsets.all(USGATheme.spacingLg),
-            child: Row(
+          const SizedBox(width: USGATheme.spacingMd),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    color: USGATheme.primaryNavy.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(USGATheme.radiusMd),
-                  ),
-                  child: Icon(
-                    icon,
-                    color: USGATheme.primaryNavy,
-                    size: 24,
-                  ),
+                Text(
+                  title,
+                  style: Theme.of(context).textTheme.titleMedium,
                 ),
-                const SizedBox(width: USGATheme.spacingMd),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: USGATheme.adaptiveTextPrimary(_themeManager.isDarkMode),
-                          letterSpacing: 0.1,
-                          height: 1.5,
-                        ),
-                      ),
-                      const SizedBox(height: USGATheme.spacingXs),
-                      Text(
-                        subtitle,
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w400,
-                          color: USGATheme.adaptiveTextTertiary(_themeManager.isDarkMode),
-                          letterSpacing: 0.3,
-                          height: 1.6,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Icon(
-                  Icons.chevron_right_rounded,
-                  color: USGATheme.adaptiveTextTertiary(_themeManager.isDarkMode),
-                  size: 20,
+                const SizedBox(height: USGATheme.spacingXs),
+                Text(
+                  subtitle,
+                  style: Theme.of(context).textTheme.bodySmall,
                 ),
               ],
             ),
           ),
-        ),
+          Icon(
+            Icons.chevron_right_rounded,
+            color: USGATheme.textTertiary,
+            size: 20,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// Placeholder for EditProfileScreen - you'll need to create this
+class EditProfileScreen extends StatelessWidget {
+  final Map<String, dynamic> userData;
+  
+  const EditProfileScreen({super.key, required this.userData});
+  
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Edit Profile')),
+      body: const Center(
+        child: Text('Edit Profile Screen - To be implemented'),
       ),
     );
   }

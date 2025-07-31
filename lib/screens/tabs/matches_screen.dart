@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../theme/usga_theme.dart';
+import '../../theme/theme_manager.dart';
+import '../../utils/privacy_utils.dart';
 
 class MatchesScreen extends StatefulWidget {
   const MatchesScreen({super.key});
@@ -14,8 +16,10 @@ class _MatchesScreenState extends State<MatchesScreen> {
   List<Map<String, dynamic>> _confirmedMatches = [];
   List<Map<String, dynamic>> _upcomingMatches = [];
   List<Map<String, dynamic>> _pastMatches = [];
+  List<Map<String, dynamic>> _pendingMatches = []; // ✅ Added pending matches
   bool _loading = true;
   String? _error;
+  final ThemeManager _themeManager = ThemeManager();
 
   @override
   void initState() {
@@ -59,6 +63,18 @@ class _MatchesScreenState extends State<MatchesScreen> {
           .eq('status', 'active')
           .order('created_at', ascending: false);
 
+      // ✅ Load my pending matches (matches I created but no one has joined yet)
+      final pendingMatchesResponse = await Supabase.instance.client
+          .from('matches')
+          .select('''
+            *,
+            creator_profile:profiles!creator_id(full_name, age)
+          ''')
+          .eq('creator_id', currentUserId)
+          .eq('status', 'active')
+          .is_('teammate_id', null) // No one has joined yet
+          .order('created_at', ascending: false);
+
       // Add teammate profile data for each match
       final List<Map<String, dynamic>> matchesWithTeammates = [];
       for (var match in allMyMatchesResponse) {
@@ -86,6 +102,7 @@ class _MatchesScreenState extends State<MatchesScreen> {
 
       setState(() {
         _matchRequests = List<Map<String, dynamic>>.from(requestsResponse);
+        _pendingMatches = List<Map<String, dynamic>>.from(pendingMatchesResponse); // ✅ Set pending matches
         
         // All matches are now in one list - no need for separate confirmed/my matches
         _confirmedMatches = matchesWithTeammates;
@@ -95,7 +112,7 @@ class _MatchesScreenState extends State<MatchesScreen> {
       // Separate matches into upcoming and past
       _separateMatches();
 
-      print('Matches screen: Loaded ${_matchRequests.length} requests, ${_confirmedMatches.length} total matches');
+      print('Matches screen: Loaded ${_matchRequests.length} requests, ${_pendingMatches.length} pending, ${_confirmedMatches.length} total matches');
       print('Upcoming: ${_upcomingMatches.length} matches');
       print('Past: ${_pastMatches.length} matches');
     } catch (error) {
@@ -198,6 +215,65 @@ class _MatchesScreenState extends State<MatchesScreen> {
     return months[month - 1];
   }
 
+  // ✅ Edit match functionality
+  Future<void> _editMatch(Map<String, dynamic> match) async {
+    // For now, show a simple dialog. In the future, you could navigate to an edit screen
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Edit Match'),
+        content: const Text('Edit match functionality coming soon! For now, you can cancel and create a new match.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ✅ Cancel match functionality
+  Future<void> _cancelMatch(Map<String, dynamic> match) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Cancel Match'),
+        content: const Text('Are you sure you want to cancel this match? This action cannot be undone.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Keep Match'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: TextButton.styleFrom(foregroundColor: USGATheme.error),
+            child: const Text('Cancel Match'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      try {
+        await Supabase.instance.client
+            .from('matches')
+            .update({'status': 'cancelled'})
+            .eq('id', match['id']);
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Match cancelled successfully')),
+        );
+
+        _loadMatches(); // Refresh the list
+      } catch (error) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error cancelling match: $error')),
+        );
+      }
+    }
+  }
+
   String _getOrdinalSuffix(int day) {
     if (day >= 11 && day <= 13) return 'th';
     switch (day % 10) {
@@ -252,8 +328,13 @@ class _MatchesScreenState extends State<MatchesScreen> {
 
   Widget _buildMatchRequestCard(Map<String, dynamic> request) {
     final match = request['matches'];
-    final requesterProfile = request['profiles'];
-    final requesterName = requesterProfile?['full_name'] ?? 'Unknown Player';
+    final requesterProfile = request['requester_profile']; // ✅ Fixed: was 'profiles', should be 'requester_profile'
+    final currentUserId = Supabase.instance.client.auth.currentUser?.id;
+    final fullName = requesterProfile?['full_name'] ?? 'Unknown Player';
+    final requesterName = PrivacyUtils.formatDisplayName(
+      fullName,
+      isCurrentUser: requesterProfile?['id'] == currentUserId,
+    );
     final requestType = request['request_type'];
 
     return Container(
@@ -306,8 +387,17 @@ class _MatchesScreenState extends State<MatchesScreen> {
             _buildMatchDetail(Icons.location_on, _formatMatchLocation(match)),
             _buildMatchDetail(Icons.schedule, _formatSchedule(match)),
             _buildMatchDetail(Icons.sports_golf, '${match['match_type']} | ${match['match_mode']}'),
-            if (match['teammate_profile'] != null)
-              _buildMatchDetail(Icons.group, 'Current teammate: ${match['teammate_profile']['full_name']}'),
+            if (match['teammate_profile'] != null) ...[
+              () {
+                final currentUserId = Supabase.instance.client.auth.currentUser?.id;
+                final teammateFullName = match['teammate_profile']['full_name'];
+                final teammateDisplayName = PrivacyUtils.formatDisplayName(
+                  teammateFullName,
+                  isCurrentUser: match['teammate_profile']['id'] == currentUserId,
+                );
+                return _buildMatchDetail(Icons.group, 'Current teammate: $teammateDisplayName');
+              }(),
+            ],
             const SizedBox(height: 20),
             Row(
               mainAxisAlignment: MainAxisAlignment.end,
@@ -359,9 +449,13 @@ class _MatchesScreenState extends State<MatchesScreen> {
   }
 
   Widget _buildConfirmedMatchCard(Map<String, dynamic> match) {
-    final profile = match['profiles'];
-    final playerName = profile?['full_name'] ?? 'Unknown Player';
+    final profile = match['creator_profile']; // ✅ Fixed: was 'profiles', should be 'creator_profile'
     final currentUserId = Supabase.instance.client.auth.currentUser?.id;
+    final fullName = profile?['full_name'] ?? 'Unknown Player';
+    final playerName = PrivacyUtils.formatDisplayName(
+      fullName,
+      isCurrentUser: profile?['id'] == currentUserId,
+    );
     final isMyMatch = match['creator_id'] == currentUserId;
 
     return Container(
@@ -417,8 +511,17 @@ class _MatchesScreenState extends State<MatchesScreen> {
                     const SizedBox(height: 8),
                     _buildMatchDetail(Icons.location_on, _formatMatchLocation(match)),
                     _buildMatchDetail(Icons.schedule, _formatSchedule(match)),
-                    if (match['teammate_profile'] != null)
-                      _buildMatchDetail(Icons.group, 'Teammate: ${match['teammate_profile']['full_name']}'),
+                    if (match['teammate_profile'] != null) ...[
+                      () {
+                        final currentUserId = Supabase.instance.client.auth.currentUser?.id;
+                        final teammateFullName = match['teammate_profile']['full_name'];
+                        final teammateDisplayName = PrivacyUtils.formatDisplayName(
+                          teammateFullName,
+                          isCurrentUser: match['teammate_profile']['id'] == currentUserId,
+                        );
+                        return _buildMatchDetail(Icons.group, 'Teammate: $teammateDisplayName');
+                      }(),
+                    ],
                   ],
                 ),
               ),
@@ -434,9 +537,13 @@ class _MatchesScreenState extends State<MatchesScreen> {
   }
 
   Widget _buildPastMatchCard(Map<String, dynamic> match) {
-    final profile = match['profiles'];
-    final playerName = profile?['full_name'] ?? 'Unknown Player';
+    final profile = match['creator_profile']; // ✅ Fixed: was 'profiles', should be 'creator_profile'
     final currentUserId = Supabase.instance.client.auth.currentUser?.id;
+    final fullName = profile?['full_name'] ?? 'Unknown Player';
+    final playerName = PrivacyUtils.formatDisplayName(
+      fullName,
+      isCurrentUser: profile?['id'] == currentUserId,
+    );
     final isMyMatch = match['creator_id'] == currentUserId;
 
     return Container(
@@ -542,7 +649,15 @@ class _MatchesScreenState extends State<MatchesScreen> {
                             const SizedBox(width: 6),
                             Expanded(
                               child: Text(
-                                'Teammate: ${match['teammate_profile']['full_name']}',
+                                () {
+                                  final currentUserId = Supabase.instance.client.auth.currentUser?.id;
+                                  final teammateFullName = match['teammate_profile']['full_name'];
+                                  final teammateDisplayName = PrivacyUtils.formatDisplayName(
+                                    teammateFullName,
+                                    isCurrentUser: match['teammate_profile']['id'] == currentUserId,
+                                  );
+                                  return 'Teammate: $teammateDisplayName';
+                                }(),
                                 style: TextStyle(
                                   fontSize: 13,
                                   color: USGATheme.textLight.withOpacity(0.8),
@@ -568,21 +683,26 @@ class _MatchesScreenState extends State<MatchesScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: USGATheme.backgroundWhite,
-      appBar: AppBar(
-        title: const Text('My Matches'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _loadMatches,
+    return AnimatedBuilder(
+      animation: _themeManager,
+      builder: (context, child) {
+        return Scaffold(
+          backgroundColor: USGATheme.adaptiveBackground(_themeManager.isDarkMode),
+          appBar: AppBar(
+            title: const Text('My Matches'),
+            backgroundColor: USGATheme.adaptiveBackground(_themeManager.isDarkMode),
+            foregroundColor: USGATheme.adaptiveTextPrimary(_themeManager.isDarkMode),
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.refresh),
+                onPressed: _loadMatches,
+              ),
+            ],
           ),
-        ],
-      ),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : _error != null
-              ? Center(
+          body: _loading
+              ? const Center(child: CircularProgressIndicator())
+              : _error != null
+                  ? Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
@@ -618,7 +738,7 @@ class _MatchesScreenState extends State<MatchesScreen> {
                     padding: const EdgeInsets.all(16),
                     children: [
                       // Match Requests Section
-                      USGATheme.buildSectionHeader('Match Requests'),
+                      USGATheme.sectionHeader('Match Requests'),
                       const SizedBox(height: 12),
                       if (_matchRequests.isEmpty)
                         _buildEmptyStateCard(
@@ -630,8 +750,21 @@ class _MatchesScreenState extends State<MatchesScreen> {
 
                       const SizedBox(height: 32),
 
+                      // ✅ Pending Matches Section (matches you posted but no one joined)
+                      USGATheme.sectionHeader('My Posted Matches'),
+                      const SizedBox(height: 12),
+                      if (_pendingMatches.isEmpty)
+                        _buildEmptyStateCard(
+                          'No posted matches waiting for players',
+                          Icons.post_add_outlined,
+                        )
+                      else
+                        ..._pendingMatches.map((match) => _buildPendingMatchCard(match)),
+
+                      const SizedBox(height: 32),
+
                       // Upcoming Matches Section
-                      USGATheme.buildSectionHeader('Upcoming Matches'),
+                      USGATheme.sectionHeader('Upcoming Matches'),
                       const SizedBox(height: 12),
                       if (_upcomingMatches.isEmpty)
                         _buildEmptyStateCard(
@@ -644,7 +777,7 @@ class _MatchesScreenState extends State<MatchesScreen> {
                       const SizedBox(height: 32),
 
                       // Past Matches Section
-                      USGATheme.buildSectionHeader('Match History'),
+                      USGATheme.sectionHeader('Match History'),
                       const SizedBox(height: 12),
                       if (_pastMatches.isEmpty)
                         _buildEmptyStateCard(
@@ -656,6 +789,107 @@ class _MatchesScreenState extends State<MatchesScreen> {
                     ],
                   ),
                 ),
+        );
+      },
+    );
+  }
+
+  Widget _buildPendingMatchCard(Map<String, dynamic> match) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: USGATheme.cardWhite,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: USGATheme.accentGold.withOpacity(0.3)), // ✅ Gold border for pending
+        boxShadow: [
+          BoxShadow(
+            color: USGATheme.primaryNavy.withOpacity(0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header with pending status
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: USGATheme.accentGold.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: USGATheme.accentGold.withOpacity(0.3)),
+                  ),
+                  child: Text(
+                    'WAITING FOR PLAYERS',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                      color: USGATheme.accentGold,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ),
+                const Spacer(),
+                Icon(
+                  Icons.visibility,
+                  size: 16,
+                  color: USGATheme.textLight,
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  'Visible to others',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: USGATheme.textLight,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            
+            // Match details
+            _buildMatchDetail(Icons.location_on, _formatMatchLocation(match)),
+            _buildMatchDetail(Icons.schedule, _formatSchedule(match)),
+            _buildMatchDetail(Icons.sports_golf, '${match['match_type']} | ${match['match_mode']}'),
+            
+            // Match notes if any
+            if (match['notes'] != null && (match['notes'] as String).isNotEmpty) ...[
+              const SizedBox(height: 8),
+              _buildMatchDetail(Icons.notes, match['notes']),
+            ],
+            
+            const SizedBox(height: 16),
+            
+            // Action buttons
+            Row(
+              children: [
+                Expanded(
+                  child: USGATheme.modernButton(
+                    text: 'Edit Match',
+                    onPressed: () => _editMatch(match),
+                    isPrimary: false,
+                    icon: Icons.edit,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: USGATheme.modernButton(
+                    text: 'Cancel Match',
+                    onPressed: () => _cancelMatch(match),
+                    isDestructive: true,
+                    icon: Icons.cancel,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 

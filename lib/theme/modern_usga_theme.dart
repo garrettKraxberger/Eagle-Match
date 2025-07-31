@@ -9,59 +9,28 @@ class USGATheme {
   static const Color accentRed = Color(0xFFCC2936);
   static const Color lightRed = Color(0xFFE8384F);
   
-  // Light Mode Colors
+  // Modern neutral palette
   static const Color backgroundWhite = Color(0xFFFFFFFF);
   static const Color backgroundGray = Color(0xFFF8F9FA);
   static const Color surfaceWhite = Color(0xFFFFFFFF);
   static const Color surfaceGray = Color(0xFFF1F3F4);
   
-  // Dark Mode Colors
-  static const Color darkBackground = Color(0xFF0F1419);
-  static const Color darkBackgroundSecondary = Color(0xFF1C2128);
-  static const Color darkSurface = Color(0xFF21262D);
-  static const Color darkSurfaceVariant = Color(0xFF30363D);
-  
-  // Light Mode Text Colors
+  // Modern text colors
   static const Color textPrimary = Color(0xFF1B365D);
   static const Color textSecondary = Color(0xFF6B7C93);
   static const Color textTertiary = Color(0xFF9CA3AF);
   static const Color textDisabled = Color(0xFFD1D5DB);
-  
-  // Dark Mode Text Colors
-  static const Color darkTextPrimary = Color(0xFFF0F6FC);
-  static const Color darkTextSecondary = Color(0xFFB1BAC4);
-  static const Color darkTextTertiary = Color(0xFF7D8590);
-  static const Color darkTextDisabled = Color(0xFF484F58);
-  
-  // Adaptive Colors
-  static Color adaptiveTextPrimary(bool isDark) => isDark ? darkTextPrimary : textPrimary;
-  static Color adaptiveTextSecondary(bool isDark) => isDark ? darkTextSecondary : textSecondary;
-  static Color adaptiveTextTertiary(bool isDark) => isDark ? darkTextTertiary : textTertiary;
-  static Color adaptiveBackground(bool isDark) => isDark ? darkBackground : backgroundWhite;
-  static Color adaptiveSurface(bool isDark) => isDark ? darkSurface : surfaceWhite;
-  static Color adaptiveBorder(bool isDark) => isDark ? darkBorderLight : borderLight;
   
   // Modern border and divider colors
   static const Color borderLight = Color(0xFFE5E7EB);
   static const Color borderMedium = Color(0xFFD1D5DB);
   static const Color divider = Color(0xFFF3F4F6);
   
-  // Dark Mode Borders
-  static const Color darkBorderLight = Color(0xFF30363D);
-  static const Color darkBorderMedium = Color(0xFF21262D);
-  static const Color darkDivider = Color(0xFF21262D);
-  
-  // Semantic colors (same for both themes)
+  // Semantic colors
   static const Color success = Color(0xFF10B981);
   static const Color warning = Color(0xFFF59E0B);
   static const Color error = Color(0xFFEF4444);
   static const Color info = Color(0xFF3B82F6);
-  
-  // Legacy compatibility colors
-  static const Color cardWhite = surfaceWhite;
-  static const Color textDark = textPrimary;
-  static const Color textLight = textSecondary;
-  static const Color successGreen = success;
   
   // Spacing scale (8px base)
   static const double spacing2xs = 2.0;
@@ -88,71 +57,52 @@ class USGATheme {
   static const double elevationLg = 8.0;
   static const double elevationXl = 16.0;
 
-  static ThemeData get theme => lightTheme; // Default to light theme
-  
-  static ThemeData get lightTheme {
-    return _buildTheme(isDark: false);
-  }
-  
-  static ThemeData get darkTheme {
-    return _buildTheme(isDark: true);
-  }
-
-  static ThemeData _buildTheme({required bool isDark}) {
+  static ThemeData get theme {
     return ThemeData(
       useMaterial3: true,
-      brightness: isDark ? Brightness.dark : Brightness.light,
       
       // Color scheme
       colorScheme: ColorScheme.fromSeed(
         seedColor: primaryNavy,
-        brightness: isDark ? Brightness.dark : Brightness.light,
+        brightness: Brightness.light,
         primary: primaryNavy,
         secondary: accentGold,
         tertiary: accentRed,
-        surface: adaptiveSurface(isDark),
-        background: adaptiveBackground(isDark),
+        surface: surfaceWhite,
         error: error,
-        onPrimary: Colors.white,
-        onSecondary: isDark ? darkTextPrimary : textPrimary,
-        onSurface: adaptiveTextPrimary(isDark),
-        onBackground: adaptiveTextPrimary(isDark),
       ),
       
       // Typography
       fontFamily: 'SF Pro Display',
-      textTheme: _buildTextTheme(isDark),
+      textTheme: _buildTextTheme(),
       
       // App Bar
       appBarTheme: AppBarTheme(
-        backgroundColor: adaptiveBackground(isDark),
-        foregroundColor: adaptiveTextPrimary(isDark),
+        backgroundColor: backgroundWhite,
+        foregroundColor: textPrimary,
         elevation: 0,
         centerTitle: false,
-        systemOverlayStyle: isDark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark,
-        titleTextStyle: TextStyle(
+        systemOverlayStyle: SystemUiOverlayStyle.dark,
+        titleTextStyle: const TextStyle(
           fontSize: 24,
           fontWeight: FontWeight.w700,
-          color: adaptiveTextPrimary(isDark),
+          color: textPrimary,
           letterSpacing: -0.5,
         ),
-        iconTheme: IconThemeData(
-          color: adaptiveTextPrimary(isDark),
+        iconTheme: const IconThemeData(
+          color: textPrimary,
           size: 24,
         ),
       ),
       
       // Cards
       cardTheme: CardThemeData(
-        color: adaptiveSurface(isDark),
+        color: surfaceWhite,
         elevation: 0,
         shadowColor: Colors.transparent,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(radiusLg),
-          side: BorderSide(
-            color: adaptiveBorder(isDark), 
-            width: 1
-          ),
+          side: const BorderSide(color: borderLight, width: 1),
         ),
         margin: const EdgeInsets.all(0),
       ),
@@ -178,10 +128,10 @@ class USGATheme {
       
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
-          foregroundColor: adaptiveTextPrimary(isDark),
+          foregroundColor: primaryNavy,
           backgroundColor: Colors.transparent,
           elevation: 0,
-          side: BorderSide(color: adaptiveBorder(isDark), width: 1.5),
+          side: const BorderSide(color: borderMedium, width: 1.5),
           padding: const EdgeInsets.symmetric(horizontal: spacingLg, vertical: spacingMd),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(radiusMd),
@@ -196,7 +146,7 @@ class USGATheme {
       
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
-          foregroundColor: adaptiveTextPrimary(isDark),
+          foregroundColor: primaryNavy,
           padding: const EdgeInsets.symmetric(horizontal: spacingMd, vertical: spacingSm),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(radiusSm),
@@ -212,14 +162,14 @@ class USGATheme {
       // Input decoration
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: isDark ? darkSurfaceVariant : surfaceGray,
+        fillColor: surfaceGray,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(radiusMd),
           borderSide: BorderSide.none,
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(radiusMd),
-          borderSide: BorderSide(color: adaptiveBorder(isDark), width: 1),
+          borderSide: const BorderSide(color: borderLight, width: 1),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(radiusMd),
@@ -230,38 +180,38 @@ class USGATheme {
           borderSide: const BorderSide(color: error, width: 1),
         ),
         contentPadding: const EdgeInsets.symmetric(horizontal: spacingMd, vertical: spacingMd),
-        labelStyle: TextStyle(
-          color: adaptiveTextSecondary(isDark),
+        labelStyle: const TextStyle(
+          color: textSecondary,
           fontSize: 16,
           fontWeight: FontWeight.w500,
         ),
-        hintStyle: TextStyle(
-          color: adaptiveTextTertiary(isDark),
+        hintStyle: const TextStyle(
+          color: textTertiary,
           fontSize: 16,
           fontWeight: FontWeight.w400,
         ),
       ),
       
       // Bottom navigation
-      bottomNavigationBarTheme: BottomNavigationBarThemeData(
-        backgroundColor: adaptiveBackground(isDark),
+      bottomNavigationBarTheme: const BottomNavigationBarThemeData(
+        backgroundColor: backgroundWhite,
         selectedItemColor: accentRed,
-        unselectedItemColor: adaptiveTextTertiary(isDark),
+        unselectedItemColor: textTertiary,
         type: BottomNavigationBarType.fixed,
         elevation: 0,
-        selectedLabelStyle: const TextStyle(
+        selectedLabelStyle: TextStyle(
           fontSize: 12,
           fontWeight: FontWeight.w600,
         ),
-        unselectedLabelStyle: const TextStyle(
+        unselectedLabelStyle: TextStyle(
           fontSize: 12,
           fontWeight: FontWeight.w500,
         ),
       ),
       
       // Divider
-      dividerTheme: DividerThemeData(
-        color: isDark ? darkDivider : divider,
+      dividerTheme: const DividerThemeData(
+        color: divider,
         thickness: 1,
         space: 1,
       ),
@@ -277,31 +227,27 @@ class USGATheme {
     );
   }
   
-  static TextTheme _buildTextTheme(bool isDark) {
-    final primaryColor = adaptiveTextPrimary(isDark);
-    final secondaryColor = adaptiveTextSecondary(isDark);
-    final tertiaryColor = adaptiveTextTertiary(isDark);
-    
-    return TextTheme(
+  static TextTheme _buildTextTheme() {
+    return const TextTheme(
       // Display styles
       displayLarge: TextStyle(
         fontSize: 48,
         fontWeight: FontWeight.w800,
-        color: primaryColor,
+        color: textPrimary,
         letterSpacing: -1.0,
         height: 1.1,
       ),
       displayMedium: TextStyle(
         fontSize: 36,
         fontWeight: FontWeight.w700,
-        color: primaryColor,
+        color: textPrimary,
         letterSpacing: -0.8,
         height: 1.2,
       ),
       displaySmall: TextStyle(
         fontSize: 28,
         fontWeight: FontWeight.w700,
-        color: primaryColor,
+        color: textPrimary,
         letterSpacing: -0.6,
         height: 1.3,
       ),
@@ -310,21 +256,21 @@ class USGATheme {
       headlineLarge: TextStyle(
         fontSize: 24,
         fontWeight: FontWeight.w700,
-        color: primaryColor,
+        color: textPrimary,
         letterSpacing: -0.5,
         height: 1.3,
       ),
       headlineMedium: TextStyle(
         fontSize: 20,
         fontWeight: FontWeight.w600,
-        color: primaryColor,
+        color: textPrimary,
         letterSpacing: -0.3,
         height: 1.4,
       ),
       headlineSmall: TextStyle(
         fontSize: 18,
         fontWeight: FontWeight.w600,
-        color: primaryColor,
+        color: textPrimary,
         letterSpacing: -0.2,
         height: 1.4,
       ),
@@ -333,21 +279,21 @@ class USGATheme {
       titleLarge: TextStyle(
         fontSize: 18,
         fontWeight: FontWeight.w600,
-        color: primaryColor,
+        color: textPrimary,
         letterSpacing: 0,
         height: 1.4,
       ),
       titleMedium: TextStyle(
         fontSize: 16,
         fontWeight: FontWeight.w600,
-        color: primaryColor,
+        color: textPrimary,
         letterSpacing: 0.1,
         height: 1.5,
       ),
       titleSmall: TextStyle(
         fontSize: 14,
         fontWeight: FontWeight.w600,
-        color: primaryColor,
+        color: textPrimary,
         letterSpacing: 0.1,
         height: 1.5,
       ),
@@ -356,21 +302,21 @@ class USGATheme {
       bodyLarge: TextStyle(
         fontSize: 16,
         fontWeight: FontWeight.w400,
-        color: primaryColor,
+        color: textPrimary,
         letterSpacing: 0.1,
         height: 1.5,
       ),
       bodyMedium: TextStyle(
         fontSize: 14,
         fontWeight: FontWeight.w400,
-        color: secondaryColor,
+        color: textSecondary,
         letterSpacing: 0.2,
         height: 1.6,
       ),
       bodySmall: TextStyle(
         fontSize: 12,
         fontWeight: FontWeight.w400,
-        color: tertiaryColor,
+        color: textTertiary,
         letterSpacing: 0.3,
         height: 1.6,
       ),
@@ -379,21 +325,21 @@ class USGATheme {
       labelLarge: TextStyle(
         fontSize: 14,
         fontWeight: FontWeight.w600,
-        color: primaryColor,
+        color: textPrimary,
         letterSpacing: 0.1,
         height: 1.4,
       ),
       labelMedium: TextStyle(
         fontSize: 12,
         fontWeight: FontWeight.w600,
-        color: secondaryColor,
+        color: textSecondary,
         letterSpacing: 0.2,
         height: 1.4,
       ),
       labelSmall: TextStyle(
         fontSize: 11,
         fontWeight: FontWeight.w500,
-        color: tertiaryColor,
+        color: textTertiary,
         letterSpacing: 0.3,
         height: 1.4,
       ),
@@ -406,17 +352,16 @@ class USGATheme {
     EdgeInsetsGeometry? padding,
     EdgeInsetsGeometry? margin,
     VoidCallback? onTap,
-    bool isDark = false,
   }) {
     return Container(
       margin: margin ?? const EdgeInsets.symmetric(horizontal: spacingMd, vertical: spacingSm),
       decoration: BoxDecoration(
-        color: adaptiveSurface(isDark),
+        color: surfaceWhite,
         borderRadius: BorderRadius.circular(radiusLg),
-        border: Border.all(color: adaptiveBorder(isDark), width: 1),
+        border: Border.all(color: borderLight, width: 1),
         boxShadow: [
           BoxShadow(
-            color: primaryNavy.withValues(alpha: isDark ? 0.1 : 0.04),
+            color: primaryNavy.withOpacity(0.04),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -436,22 +381,21 @@ class USGATheme {
     );
   }
 
-  static Widget sectionHeader(String title, {String? subtitle, Widget? action, bool isDark = false}) {
+  static Widget sectionHeader(String title, {String? subtitle, Widget? action}) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: spacingMd, vertical: spacingSm),
       child: Row(
-        mainAxisSize: MainAxisSize.min,
         children: [
-          Flexible(
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   title,
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.w700,
-                    color: adaptiveTextPrimary(isDark),
+                    color: textPrimary,
                     letterSpacing: -0.3,
                   ),
                 ),
@@ -459,10 +403,10 @@ class USGATheme {
                   const SizedBox(height: spacingXs),
                   Text(
                     subtitle,
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w400,
-                      color: adaptiveTextSecondary(isDark),
+                      color: textSecondary,
                     ),
                   ),
                 ],
@@ -475,6 +419,11 @@ class USGATheme {
     );
   }
 
+  // Legacy compatibility method
+  static Widget buildSectionHeader(String title, {String? subtitle, Widget? action}) {
+    return sectionHeader(title, subtitle: subtitle, action: action);
+  }
+
   static Widget modernButton({
     required String text,
     required VoidCallback onPressed,
@@ -482,7 +431,6 @@ class USGATheme {
     bool isPrimary = true,
     bool isDestructive = false,
     bool isFullWidth = false,
-    bool isDark = false,
   }) {
     final buttonStyle = isPrimary
         ? ElevatedButton.styleFrom(
@@ -490,9 +438,9 @@ class USGATheme {
             foregroundColor: Colors.white,
           )
         : OutlinedButton.styleFrom(
-            foregroundColor: isDestructive ? accentRed : adaptiveTextPrimary(isDark),
+            foregroundColor: isDestructive ? accentRed : primaryNavy,
             side: BorderSide(
-              color: isDestructive ? accentRed : adaptiveBorder(isDark),
+              color: isDestructive ? accentRed : borderMedium,
               width: 1.5,
             ),
           );
@@ -533,7 +481,6 @@ class USGATheme {
     required String title,
     required String message,
     Widget? action,
-    bool isDark = false,
   }) {
     return Center(
       child: Padding(
@@ -545,32 +492,32 @@ class USGATheme {
               width: 80,
               height: 80,
               decoration: BoxDecoration(
-                color: isDark ? darkSurfaceVariant : surfaceGray,
+                color: surfaceGray,
                 shape: BoxShape.circle,
               ),
               child: Icon(
                 icon,
                 size: 40,
-                color: adaptiveTextTertiary(isDark),
+                color: textTertiary,
               ),
             ),
             const SizedBox(height: spacingLg),
             Text(
               title,
-              style: TextStyle(
+              style: const TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.w600,
-                color: adaptiveTextPrimary(isDark),
+                color: textPrimary,
               ),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: spacingSm),
             Text(
               message,
-              style: TextStyle(
+              style: const TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w400,
-                color: adaptiveTextSecondary(isDark),
+                color: textSecondary,
               ),
               textAlign: TextAlign.center,
             ),
@@ -583,4 +530,10 @@ class USGATheme {
       ),
     );
   }
+
+  // Legacy compatibility colors
+  static const Color cardWhite = surfaceWhite;
+  static const Color textDark = textPrimary;
+  static const Color textLight = textSecondary;
+  static const Color successGreen = success;
 }
