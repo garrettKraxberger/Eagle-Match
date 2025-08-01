@@ -184,7 +184,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                             controller: _firstNameController,
                             label: 'First Name',
                             hint: 'Enter first name',
-                            icon: Icons.person,
                             validator: (value) {
                               if (value == null || value.trim().isEmpty) {
                                 return 'First name is required';
@@ -199,7 +198,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                             controller: _lastNameController,
                             label: 'Last Name',
                             hint: 'Enter last name',
-                            icon: Icons.person_outline,
                             validator: (value) {
                               if (value == null || value.trim().isEmpty) {
                                 return 'Last name is required';
@@ -374,7 +372,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     required TextEditingController controller,
     required String label,
     required String hint,
-    required IconData icon,
+    IconData? icon,
     TextInputType? keyboardType,
     String? Function(String?)? validator,
   }) {
@@ -389,7 +387,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       decoration: InputDecoration(
         labelText: label,
         hintText: hint,
-        prefixIcon: Icon(icon, color: USGATheme.textSecondary),
+        prefixIcon: icon != null ? Icon(icon, color: USGATheme.textSecondary) : null,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(USGATheme.radiusMd),
           borderSide: const BorderSide(color: USGATheme.borderLight),
