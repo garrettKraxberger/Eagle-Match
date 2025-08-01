@@ -14,7 +14,8 @@ class EditProfileScreen extends StatefulWidget {
 
 class _EditProfileScreenState extends State<EditProfileScreen> {
   final _formKey = GlobalKey<FormState>();
-  late TextEditingController _fullNameController;
+  late TextEditingController _firstNameController;
+  late TextEditingController _lastNameController;
   late TextEditingController _handicapController;
   late TextEditingController _locationController;
   late TextEditingController _phoneController;
@@ -26,7 +27,15 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   @override
   void initState() {
     super.initState();
-    _fullNameController = TextEditingController(text: widget.userData['full_name'] ?? '');
+    
+    // Split full name into first and last name
+    final fullName = widget.userData['full_name'] ?? '';
+    final nameParts = fullName.split(' ');
+    final firstName = nameParts.isNotEmpty ? nameParts.first : '';
+    final lastName = nameParts.length > 1 ? nameParts.skip(1).join(' ') : '';
+    
+    _firstNameController = TextEditingController(text: firstName);
+    _lastNameController = TextEditingController(text: lastName);
     _handicapController = TextEditingController(text: widget.userData['handicap']?.toString() ?? '');
     _locationController = TextEditingController(text: widget.userData['location'] ?? '');
     _phoneController = TextEditingController(text: widget.userData['phone'] ?? '');
@@ -53,7 +62,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   @override
   void dispose() {
-    _fullNameController.dispose();
+    _firstNameController.dispose();
+    _lastNameController.dispose();
     _handicapController.dispose();
     _locationController.dispose();
     _phoneController.dispose();
@@ -75,7 +85,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       if (user == null) throw Exception('User not authenticated');
 
       final updates = <String, dynamic>{
-        'full_name': _fullNameController.text.trim(),
+        'full_name': '${_firstNameController.text.trim()} ${_lastNameController.text.trim()}'.trim(),
         'birth_date': _birthDate?.toIso8601String().split('T')[0], // Store as DATE format
         'handicap': double.tryParse(_handicapController.text.trim()),
         'location': _locationController.text.trim(),
@@ -166,44 +176,63 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               USGATheme.modernCard(
                 child: Column(
                   children: [
-                    _buildTextField(
-                      controller: _fullNameController,
-                      label: 'Full Name',
-                      hint: 'Enter your full name',
-                      icon: Icons.person,
-                      validator: (value) {
-                        if (value == null || value.trim().isEmpty) {
-                          return 'Full name is required';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: USGATheme.spacingMd),
+                    // First and Last Name Row
                     Row(
                       children: [
                         Expanded(
-                          child: _buildBirthDatePicker(),
+                          child: _buildTextField(
+                            controller: _firstNameController,
+                            label: 'First Name',
+                            hint: 'Enter first name',
+                            icon: Icons.person,
+                            validator: (value) {
+                              if (value == null || value.trim().isEmpty) {
+                                return 'First name is required';
+                              }
+                              return null;
+                            },
+                          ),
                         ),
                         const SizedBox(width: USGATheme.spacingMd),
                         Expanded(
                           child: _buildTextField(
-                            controller: _handicapController,
-                            label: 'Handicap',
-                            hint: 'USGA handicap',
-                            icon: Icons.sports_golf,
-                            keyboardType: TextInputType.numberWithOptions(decimal: true),
+                            controller: _lastNameController,
+                            label: 'Last Name',
+                            hint: 'Enter last name',
+                            icon: Icons.person_outline,
                             validator: (value) {
-                              if (value != null && value.trim().isNotEmpty) {
-                                final handicap = double.tryParse(value.trim());
-                                if (handicap == null || handicap < -10 || handicap > 54) {
-                                  return 'Enter valid handicap (-10 to 54)';
-                                }
+                              if (value == null || value.trim().isEmpty) {
+                                return 'Last name is required';
                               }
                               return null;
                             },
                           ),
                         ),
                       ],
+                    ),
+                    const SizedBox(height: USGATheme.spacingMd),
+                    
+                    // Birth Date - Full Width
+                    _buildBirthDatePicker(),
+                    
+                    const SizedBox(height: USGATheme.spacingMd),
+                    
+                    // Handicap - Full Width
+                    _buildTextField(
+                      controller: _handicapController,
+                      label: 'Handicap',
+                      hint: 'USGA handicap (optional)',
+                      icon: Icons.sports_golf,
+                      keyboardType: TextInputType.numberWithOptions(decimal: true),
+                      validator: (value) {
+                        if (value != null && value.trim().isNotEmpty) {
+                          final handicap = double.tryParse(value.trim());
+                          if (handicap == null || handicap < -10 || handicap > 54) {
+                            return 'Enter valid handicap (-10 to 54)';
+                          }
+                        }
+                        return null;
+                      },
                     ),
                   ],
                 ),
